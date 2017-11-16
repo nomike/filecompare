@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""
+    filecompare.py - find duplicate files
+    Copyright (C) 2017 nomike at nomike.com
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+"""
+
+def sha256_hash(filename, block_size=65536):
+    """
+    Calculate the sha256 hash of a file
+    """
+    sha256 = hashlib.sha256()
+    with open(filename, 'rb') as f:
+        for block in iter(lambda: f.read(block_size), b''):
+            sha256.update(block)
+    return sha256.hexdigest()
+
+if __name__ == '__main__':
+    import os
+    import hashlib
+    import sys
+
+    sourcedirs = sys.argv[1:]
+
+    print ("Scanning filesizes...")
+    filesizes = {}
+    for sourcedir in sourcedirs:
+        for subdir, dirs, files in os.walk(sourcedir):
+            for f in files:
+                filename = os.path.join(subdir, f)
+                try: 
+                    filesize = os.path.getsize(filename)
+                    if filesize not in filesizes:
+                        filesizes[filesize] = []
+                    filesizes[filesize].append(filename)
+                except (OSError, IOError) as e:
+                    pass
+    
+    print ("Counting equal sized files...")
+    count = 0
+    for size, files in filesizes.items():
+        if len(files) > 1:
+            count = count + len(files)
+    print ("%d files to hash." % (count))
+    print ("Calculating hashes...")
+    hashes = {}
+    i = 0
+    for size, files in filesizes.items():
+        if len(files) > 1:
+            for filename in files:
+                try:
+                    i = i + 1
+                    sys.stdout.write(u"\033[sCalculating hash %d...\033[u" % (i))
+                    filehash = sha256_hash(filename)
+                    if filehash not in hashes:
+                        hashes[filehash] = []
+                    hashes[filehash].append(filename)
+                except (IOError) as error:
+                    pass
+
+    for filehash, filenames in hashes.items():
+        if len(filenames) > 1:
+            print ("Found duplicate files:")
+            for filename in filenames:
+                print ("\t%s" % (filename))
